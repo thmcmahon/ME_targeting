@@ -1,0 +1,53 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(themeTom)
+```
+
+
+```{r}
+sa1 <- readxl::read_excel('data_raw/Age groups by SA1 2016 census.xlsx',
+                          skip = 7) %>%
+  filter(`AGEP Age` != 'SA1 (UR)')
+newspoll <- read_csv('data_raw/newspoll.csv') %>%
+  mutate(Likely_Voter = Likely_Voter / 100, Yes_Vote = Yes_Vote / 100)
+asgs <- read_csv('data_raw/SA1_2016_AUST.csv') %>%
+  mutate(sa1 = as.character(SA1_7DIGITCODE_2016))
+electorates <- read_csv('data_raw/SA1s 2016 to CED 2017.csv') %>%
+  mutate(sa1 = as.character(SA1_sevendigitcode_2016))
+```
+
+```{r}
+df <- newspoll %>%
+  mutate(adj_yes = Likely_Voter * Yes_Vote) %>%
+  select(adj_yes) %>%
+  t %>%
+  cbind(sa1, .) %>%
+  mutate(y18_34 = `age 18-34` * `1`, y35_49 = `age 35-49` * `2`,
+         y50_64 = `age 50-64` * `3`, y65_plus = `age 65 and over` * `4`)%>%
+  select(sa1 = `AGEP Age`, t18_34 = `age 18-34`, t35_49 = `age 35-49`,
+         t50_64 = `age 50-64`, t65_plus = `age 65 and over`, tTotal = Total,
+         y18_34, y35_49, y50_64, y65_plus) %>%
+  mutate(yTotal = y18_34 + y35_49 + y50_64 + y65_plus) %>%
+  as_tibble %>%
+  left_join(asgs) %>%
+  left_join(electorates) %>%
+  select(sa1, t18_34, t35_49, t50_64, t65_plus, tTotal,
+         y18_34, y35_49, y50_64, y65_plus, yTotal, sa2 = SA2_NAME_2016,
+         sa3 = SA3_NAME_2016, state = STATE_NAME_2016, electorate = CED_NAME_2017)
+```
+
+```{r}
+df %>%
+  group_by(electorate) %>%
+  summarise(yTotal = sum(yTotal), tTotal = sum(tTotal)) %>%
+  mutate(yprop = yTotal / tTotal) %>%
+  select(electorate, yprop) %>%
+  arrange(desc(yprop))
+```
+
+
